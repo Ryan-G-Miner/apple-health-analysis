@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 from datetime import date
 
 # read in main data
-df1= pd.read_csv("/Users/RyanMiner/Desktop/Github/apple-health-analysis/data/source csvs/HealthAutoExport-2025-03-06-2025-06-04.csv", index_col=False)
+df1= pd.read_csv("/Users/RyanMiner/Library/Mobile Documents/com~apple~CloudDocs/Github/apple-health-analysis/data/source csvs/HealthAutoExport-2025-03-06-2025-06-04.csv", index_col=False)
 
 # read in sleep data 
-df2 = pd.read_csv("/Users/RyanMiner/Desktop/Github/apple-health-analysis/data/source csvs/Sleep Analysis 2.csv")
+df2 = pd.read_csv("/Users/RyanMiner/Library/Mobile Documents/com~apple~CloudDocs/Github/apple-health-analysis/data/source csvs/Sleep Analysis 2.csv")
 
 # Drop unneeded main columns
 df1 = df1.drop([
@@ -166,10 +166,136 @@ plt.xticks(rotation=45,ha='right')
 plt.tight_layout()
 plt.title("Missing Data Heatmap")
 plt.xlabel("Columns")
-plt.show()
+#plt.show()
 
-# save finished dataset to csv for analysis
-# today's date 
+# normalize data
+
+# rule of thumb for each health metric: 
+            # if higher is better
+
+            # def normalize(metric_value):
+            #     return min(max((metric_value - healthy_min) / (healthy_max - healthy_min), 0), 1)
+
+###########     ###########      ###########        ###########      #############
+            # if lower is better, invert the scale:
+
+            # def normalize_inverse(metric_value):
+            #     return min(max((healthy_max - metric_value) / (healthy_max - healthy_min), 0), 1)
+
+''' 
+Other notes: 
+Max Heart Rate is hard to normalize; 
+    - Penalizing the maximums penalizes exercise but captures heart irregularity
+    - A higher average heart rate is likely due to exercise, so a high or low average can't be penalized 
+    - Decided to only take min heart rate, hope to capture exercise data through active k/cals and active minutes  
+
+'''
+
+
+
+################################ Exercise Time ####################################
+
+def normalize_exercise_time(extime):
+    '''
+    The 25th percentile seems to capture most of the drop off. . . 
+    But an upper bound of 75 would over-reward moderately good days. 
+    Decided to use 25th as lower bound and 90th as upper
+    -- 25th percentile is low bound
+    -- 90th percentile is upper bound
+    '''
+    healthy_min = df_merged['Apple Exercise Time (min)'].quantile(0.25) 
+    healthy_max = df_merged['Apple Exercise Time (min)'].quantile(0.90)
+
+    normalized = (extime - healthy_min) / (healthy_max - healthy_min) 
+    return min(max(normalized, 0), 1)
+df_merged['N - Apple Exercise Time (min)'] = df_merged['Apple Exercise Time (min)'].apply(normalize_exercise_time)
+
+############################################# More = Better ######################################################
+
+more_better = [
+        'Active Energy (kcal)',
+        'VO2 Max (ml/(kg·min))', 
+        'Heart Rate Variability (ms)',
+        'Apple Stand Time (min)',
+        'Sleep Analysis [Total] (hr)',
+        'Sleep Analysis [Core] (hr)',
+        'Sleep Analysis [Deep] (hr)',
+        'Sleep Analysis [REM] (hr)'
+             ]
+
+
+for x in more_better:
+    def normalize(value):
+
+        healthy_min = df_merged[x].quantile(0.05)
+        healthy_max = df_merged[x].quantile(0.95)
+
+        normalized = (value - healthy_min) / (healthy_max - healthy_min) 
+ 
+        return min(max(normalized, 0), 1)
+    df_merged['N - ' + x] = df_merged[x].apply(normalize)
+
+######################################## Less = Better ##########################################
+
+less_better = [
+    'Heart Rate [Min] (bpm)',
+    'Respiratory Rate (count/min)'
+]
+
+for x in less_better:
+    def normalize(value):
+
+        healthy_min = df_merged[x].quantile(0.05)
+        healthy_max = df_merged[x].quantile(0.95)
+
+        normalized = (healthy_max - value) / (healthy_max - healthy_min) 
+ 
+        return min(max(normalized, 0), 1)
+    df_merged['N - ' + x] = df_merged[x].apply(normalize)
+
+### Notes from Jun 9: 
+
+'''
+- Determine which spreads to increase 
+- Sort out negative (less better) variables
+- Rewrite functions to accommodate 
+'''
+
+############################## APPLY WEIGHTS ##############################
+
+'''
+Asked for ChatGPT's help in determining weights for each health metric based on academic research
+'''
+
+# Determined Weights: 
+weights = {
+    'VO2 Max (ml/(kg·min))': 0.25,
+    'Heart Rate [Min] (bpm)': 0.10,
+    'Heart Rate Variability (ms)': 0.10,
+    'Respiratory Rate (count/min)': 0.05,
+    'Active Energy (kcal)': 0.15,
+    'Apple Stand Time (min)': 0.05,
+    'Sleep Analysis [Core] (hr)': 0.10,
+    'Sleep Analysis [Deep] (hr)': 0.10,
+    'Sleep Analysis [REM] (hr)': 0.10
+}
+
+# Prefix for normalized columns
+normalized_prefix = 'N - '
+
+# Create a health score column
+df_merged['Health Score'] = 0
+
+# Loop through each weighted metric and calculate the weighted sum
+for metric, weight in weights.items():
+    norm_col = normalized_prefix + metric
+    df_merged['Health Score'] += df_merged[norm_col] * weight
+
+# Save finished dataset to csv for analysis
+# Today's date 
 today_str = date.today().isoformat()
 
-df_merged.to_csv('cleaned_health_data_' + today_str+ '.csv')
+csvname = 'cleaned_health_data_' + today_str+ '.csv'
+df_merged.to_csv(csvname)
+
+print("Outputted Data to csv file: " + csvname)
