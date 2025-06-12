@@ -13,11 +13,11 @@ Using Python (pandas, seaborn, scikit-learn) and PowerBI, I:
 ✅ Built a daily 0–1 Health Score to visualize trends  
 
 Metrics used:
-• VO₂ Max
-• Resting HR & HRV
-• Respiratory Rate
-• Active Energy & Stand Time
-• Core, Deep, REM Sleep
+• VO₂ Max  
+• Resting HR & HRV  
+• Respiratory Rate  
+• Active Energy & Stand Time  
+• Core, Deep, REM Sleep  
 
 ✏️ Key Takeaways
 
